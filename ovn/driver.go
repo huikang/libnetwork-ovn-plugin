@@ -78,7 +78,10 @@ func (d Driver) FreeNetwork(req *network.FreeNetworkRequest) error {
 }
 
 func (d Driver) GetCapabilities() (*network.CapabilitiesResponse, error) {
-	return nil, nil
+	res := &network.CapabilitiesResponse{
+		Scope: network.LocalScope,
+	}
+	return res, nil
 }
 
 func (d Driver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {

@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Libnetwork ovn plugin")
+	fmt.Println("Start plugin", ovn.DriverName)
 
 	d, err := ovn.NewDriver()
 	if err != nil {
