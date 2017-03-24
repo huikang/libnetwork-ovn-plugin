@@ -1,0 +1,9 @@
+package: github.ibm.com/kangh/libnetwork-ovn-plugin
+import:
+- package: github.com/Sirupsen/logrus
+  version: ^0.11.5
+- package: github.com/docker/go-plugins-helpers
+  version: 8af45ff6ad5b7608853de51133c33e6638b02134
+  subpackages:
+  - network
+- package: github.com/samalba/dockerclient
