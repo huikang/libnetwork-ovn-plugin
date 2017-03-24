@@ -1,0 +1,23 @@
+dist: trusty
+language: go
+go_import_path: github.ibm.com/kangh/libnetwork-ovn-plugin
+sudo: true
+
+go:
+  - 1.8
+
+addons:
+  apt:
+      packages:
+      - libpcap-dev
+      - libaspell-dev
+      - libhunspell-dev
+      - libsystemd-journal-dev
+
+before_install:
+ - go get -v -u github.com/chzchzchz/goword
+ - go get -v -u honnef.co/go/tools/cmd/gosimple
+ - go get -v -u honnef.co/go/tools/cmd/unused
+ - go get -v -u honnef.co/go/tools/cmd/staticcheck
+
+script: make test-ci

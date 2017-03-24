@@ -23,10 +23,10 @@ type Driver struct {
 
 func NewDriver() (*Driver, error) {
 	docker, err := dockerclient.NewDockerClient("unix:///var/run/docker.sock", nil)
-        if err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("could not connect to docker: %s", err)
 	}
-	
+
 	d := &Driver{
 		dockerer: dockerer{
 			client: docker,
@@ -40,7 +40,7 @@ func (d Driver) AllocateNetwork(req *network.AllocateNetworkRequest) (*network.A
 	res := &network.AllocateNetworkResponse{
 		Options: make(map[string]string),
 	}
-	return res,nil
+	return res, nil
 }
 
 func (d Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.CreateEndpointResponse, error) {

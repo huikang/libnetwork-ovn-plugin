@@ -1,10 +1,13 @@
-hash: fbfa9daeeb4381fb2485d23983ca27f30dfa6974667dad3498500f3e1c5cdb76
-updated: 2017-03-24T21:57:38.439896882Z
+hash: 59ddb38da7e546af567ac047b2d13baf6a51a8ad7b718c6ace0a9db3e65553b6
+updated: 2017-03-25T01:08:18.29889117Z
 imports:
 - name: github.com/coreos/go-systemd
-  version: 1f9909e51b2dab2487c26d64c8f2e7e580e4c9f5
+  version: 48702e0da86bd25e76cfef347e2adeb434a0d0a6
   subpackages:
   - activation
+  - daemon
+  - journal
+  - util
 - name: github.com/docker/go-connections
   version: a2afab9802043837035592f1c24827fb70766de9
   subpackages:
@@ -20,10 +23,18 @@ imports:
   version: fff283ad5116362ca252298cfc9b95828956d85d
 - name: github.com/samalba/dockerclient
   version: a3036261847103270e9f732509f43b5f98710ace
+  subpackages:
+  - dockerclient
 - name: github.com/Sirupsen/logrus
   version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
+  subpackages:
+  - logrus
+- name: github.com/socketplane/libovsdb
+  version: 4de3618546deba09d8875d719752db32bd4652c0
+  subpackages:
+  - libovsdb
 - name: golang.org/x/net
-  version: 78ebe5c8b6a27ec13109c73c22193d618270e1e1
+  version: 6c23252515492caf9b228a9d5cabcdbde29f7f82
   subpackages:
   - proxy
 - name: golang.org/x/sys
