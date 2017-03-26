@@ -25,4 +25,5 @@ docker run \
        -v /run:/run \
        mrjana/golang ./bin/libnetwork-ovn-plugin
 
-docker network create --attachable --driver ovn test1
+NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 --gateway=10.10.10.1 test1`
+docker network inspect $NID
