@@ -9,13 +9,33 @@ import (
 	"github.com/docker/go-plugins-helpers/network"
 	"github.com/samalba/dockerclient"
 	"github.com/socketplane/libovsdb"
+	"github.com/vishvananda/netlink"
 )
 
 const (
-	DriverName = "ovn"
-	localhost  = "127.0.0.1"
+	DriverName          = "ovn"
+	localhost           = "127.0.0.1"
+	bridgePrefix        = "ovnbr-"
+	bridgeNameOption    = "net.libnetwork.ovn.bridge.name"
+	bindInterfaceOption = "net.libnetwork.ovn.bridge.bind_interface"
+
+	mtuOption  = "net.libnetwork.ovn.bridge.mtu"
+	modeOption = "net.libnetwork.ovn.bridge.mode"
+
+	modeNAT  = "nat"
+	modeFlat = "flat"
+
+	defaultMTU  = 1500
+	defaultMode = modeNAT
 
 	ovnNBPort = 6641
+)
+
+var (
+	validModes = map[string]bool{
+		modeNAT:  true,
+		modeFlat: true,
+	}
 )
 
 type dockerer struct {
@@ -25,10 +45,69 @@ type dockerer struct {
 type Driver struct {
 	ovnnber
 	dockerer
+	networks map[string]*NetworkState
+}
+
+// NetworkState is filled in at network creation time
+// it contains state that we wish to keep for each network
+type NetworkState struct {
+	BridgeName        string
+	MTU               int
+	Mode              string
+	Gateway           string
+	GatewayMask       string
+	FlatBindInterface string
 }
 
 type ovnnber struct {
 	ovsdb *libovsdb.OvsdbClient
+}
+
+// Enable a netlink interface
+func interfaceUp(name string) error {
+	iface, err := netlink.LinkByName(name)
+	if err != nil {
+		log.Debugf("Error retrieving a link named [ %s ]", iface.Attrs().Name)
+		return err
+	}
+	return netlink.LinkSetUp(iface)
+}
+
+func truncateID(id string) string {
+	return id[:5]
+}
+
+func getBridgeName(r *network.CreateNetworkRequest) (string, error) {
+	bridgeName := bridgePrefix + truncateID(r.NetworkID)
+	if r.Options != nil {
+		if name, ok := r.Options[bridgeNameOption].(string); ok {
+			bridgeName = name
+		}
+	}
+	return bridgeName, nil
+}
+
+func getBridgeMTU(r *network.CreateNetworkRequest) (int, error) {
+	bridgeMTU := defaultMTU
+	if r.Options != nil {
+		if mtu, ok := r.Options[mtuOption].(int); ok {
+			bridgeMTU = mtu
+		}
+	}
+	return bridgeMTU, nil
+}
+
+func getBridgeMode(r *network.CreateNetworkRequest) (string, error) {
+	bridgeMode := defaultMode
+	if r.Options != nil {
+		if mode, ok := r.Options[modeOption].(string); ok {
+			if _, isValid := validModes[mode]; !isValid {
+				return "", fmt.Errorf("%s is not a valid mode", mode)
+			}
+			bridgeMode = mode
+		}
+	}
+	return bridgeMode, nil
 }
 
 func getGatewayIP(r *network.CreateNetworkRequest) (string, string, error) {
@@ -68,6 +147,16 @@ func getGatewayIP(r *network.CreateNetworkRequest) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
+func getBindInterface(r *network.CreateNetworkRequest) (string, error) {
+	if r.Options != nil {
+		if mode, ok := r.Options[bindInterfaceOption].(string); ok {
+			return mode, nil
+		}
+	}
+	// As bind interface is optional and has no default, don't return an error
+	return "", nil
+}
+
 func NewDriver() (*Driver, error) {
 	docker, err := dockerclient.NewDockerClient("unix:///var/run/docker.sock", nil)
 	if err != nil {
@@ -97,6 +186,7 @@ func NewDriver() (*Driver, error) {
 		ovnnber: ovnnber{
 			ovsdb: ovnnb,
 		},
+		networks: make(map[string]*NetworkState),
 	}
 	return d, nil
 }
@@ -110,8 +200,8 @@ func (d *Driver) AllocateNetwork(req *network.AllocateNetworkRequest) (*network.
 }
 
 func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.CreateEndpointResponse, error) {
-	log.Debugf("Create network request: %+v", req)
-	fmt.Println("Create network request", req)
+	log.Debugf("Create endpoint request: %+v", req)
+	fmt.Println("Create endpoint request", req)
 	return nil, nil
 }
 
@@ -120,13 +210,54 @@ func (d *Driver) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
 }
 
 func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
+	fmt.Printf("Create network request: %+v\n", req)
+
+	bridgeName, err := getBridgeName(req)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Bridge name:", bridgeName)
+
+	mtu, err := getBridgeMTU(req)
+	if err != nil {
+		return err
+	}
+	fmt.Println("MTU:", mtu)
+
+	mode, err := getBridgeMode(req)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Mode:", mode)
+
 	gateway, mask, err := getGatewayIP(req)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Gateway mask:", gateway, mask)
 
-	fmt.Println("Gateway", gateway, mask)
+	bindInterface, err := getBindInterface(req)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Bindinterface:", bindInterface)
 
+	ns := &NetworkState{
+		BridgeName:        bridgeName,
+		MTU:               mtu,
+		Mode:              mode,
+		Gateway:           gateway,
+		GatewayMask:       mask,
+		FlatBindInterface: bindInterface,
+	}
+
+	d.networks[req.NetworkID] = ns
+
+	log.Infof("Initializing bridge for network %s", req.NetworkID)
+	if err := d.initBridge(req.NetworkID); err != nil {
+		delete(d.networks, req.NetworkID)
+		return err
+	}
 	return nil
 }
 

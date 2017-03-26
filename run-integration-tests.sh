@@ -27,3 +27,4 @@ docker run \
 
 NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 --gateway=10.10.10.1 test1`
 docker network inspect $NID
+docker exec $cid ovn-nbctl show
