@@ -19,5 +19,7 @@ before_install:
  - go get -v -u honnef.co/go/tools/cmd/gosimple
  - go get -v -u honnef.co/go/tools/cmd/unused
  - go get -v -u honnef.co/go/tools/cmd/staticcheck
+ - sudo apt-get update
+ - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-engine
 
 script: make test-ci

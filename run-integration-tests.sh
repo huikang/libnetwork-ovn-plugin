@@ -3,6 +3,8 @@
 set -e
 set -o xtrace
 
+docker version
+
 echo "Run integration test"
 sudo service docker restart
 
