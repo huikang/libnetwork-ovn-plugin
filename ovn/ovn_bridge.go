@@ -85,3 +85,105 @@ func (ovnnber *ovnnber) addBridge(bridgeName string) error {
 	}
 	return nil
 }
+
+func (d *Driver) createEndpoint(bridgeName, logicalPortName string) error {
+	if err := d.ovnnber.addLogicalPort(bridgeName, logicalPortName); err != nil {
+		log.Errorf("error creating logical port [ %s ] on bridge [ %s ] : [ %s ]", logicalPortName, bridgeName, err)
+		return err
+	}
+	return nil
+}
+
+func (d *Driver) setEndpointAddr(logicalPortName, ipaddr, macaddr string) error {
+	if err := d.ovnnber.setLogicalPortAddr(logicalPortName, ipaddr, macaddr); err != nil {
+		log.Errorf("error set logical port [ %s ] to [ %s ] : [ %s ]", logicalPortName, ipaddr, macaddr)
+		return err
+	}
+	return nil
+}
+
+func (ovnnber *ovnnber) setLogicalPortAddr(logicalPortName, ipaddr, macaddr string) error {
+	ipmac := macaddr + " " + ipaddr
+	mutateAddr := []string{ipmac}
+	mutateSet, _ := libovsdb.NewOvsSet(mutateAddr)
+	mutation := libovsdb.NewMutation("addresses", "insert", mutateSet)
+	condition := libovsdb.NewCondition("name", "==", logicalPortName)
+
+	// Mutate operation
+	mutateOp := libovsdb.Operation{
+		Op:        "mutate",
+		Table:     "Logical_Switch_Port",
+		Mutations: []interface{}{mutation},
+		Where:     []interface{}{condition},
+	}
+
+	operations := []libovsdb.Operation{mutateOp}
+	reply, _ := ovnnber.ovsdb.Transact("OVN_Northbound", operations...)
+
+	if len(reply) < len(operations) {
+		return errors.New("Number of Replies should be at least equal to number of Operations")
+	}
+	for i, o := range reply {
+		if o.Error != "" && i < len(operations) {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		} else if o.Error != "" {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		}
+	}
+
+	return nil
+}
+
+// Check if port exists prior to creating a bridge
+func (ovnnber *ovnnber) addLogicalPort(switchName, logicalPortName string) error {
+	log.Infof("addlogicalPort [ %s ] to switch [ %s ]", logicalPortName, switchName)
+
+	namedEndpointUUID := "endpoint"
+
+	// Bridge row to insert
+	port := make(map[string]interface{})
+	port["name"] = logicalPortName
+	port["type"] = ""
+	port["up"] = false
+
+	insertPortOp := libovsdb.Operation{
+		Op:       "insert",
+		Table:    "Logical_Switch_Port",
+		Row:      port,
+		UUIDName: namedEndpointUUID,
+	}
+
+	// Inserting a row in Logical_Switch_Port table requires mutating the Logical_Switch table.
+	mutateUUID := []libovsdb.UUID{
+		{GoUUID: namedEndpointUUID},
+	}
+	mutateSet, _ := libovsdb.NewOvsSet(mutateUUID)
+	mutation := libovsdb.NewMutation("ports", "insert", mutateSet)
+	condition := libovsdb.NewCondition("name", "==", switchName)
+
+	// Mutate operation
+	mutateOp := libovsdb.Operation{
+		Op:        "mutate",
+		Table:     "Logical_Switch",
+		Mutations: []interface{}{mutation},
+		Where:     []interface{}{condition},
+	}
+
+	operations := []libovsdb.Operation{insertPortOp, mutateOp}
+	reply, _ := ovnnber.ovsdb.Transact("OVN_Northbound", operations...)
+
+	if len(reply) < len(operations) {
+		return errors.New("Number of Replies should be at least equal to number of Operations")
+	}
+	for i, o := range reply {
+		if o.Error != "" && i < len(operations) {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		} else if o.Error != "" {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		}
+	}
+
+	log.Infof("Added port")
+
+	return nil
+}

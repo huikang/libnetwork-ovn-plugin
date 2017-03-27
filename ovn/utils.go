@@ -60,7 +60,14 @@ func setInterfaceIP(name string, rawIP string) error {
 	}
 
 	// fixmehk: The last argument could be wrong.
-	addr := &netlink.Addr{ipNet, "", 0, 0, nil, net.IP("127.0.0.1")}
+	addr := &netlink.Addr{
+		IPNet:     ipNet,
+		Label:     "",
+		Flags:     0,
+		Scope:     0,
+		Peer:      nil,
+		Broadcast: net.IP("127.0.0.1"),
+	}
 	return netlink.AddrAdd(iface, addr)
 }
 
