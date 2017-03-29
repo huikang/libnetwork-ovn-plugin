@@ -2,12 +2,8 @@ package ovn
 
 import (
 	"errors"
-	_ "fmt"
-
-	_ "time"
 
 	log "github.com/Sirupsen/logrus"
-	_ "github.com/docker/libnetwork/iptables"
 	"github.com/socketplane/libovsdb"
 )
 

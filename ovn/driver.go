@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// DriverName is the ovn plugin name
 	DriverName          = "ovn"
 	localhost           = "127.0.0.1"
 	bridgePrefix        = "ovnbr-"
@@ -42,6 +43,7 @@ type dockerer struct {
 	client *dockerclient.DockerClient
 }
 
+// Driver is ovn driver strcut
 type Driver struct {
 	ovnnber
 	dockerer
@@ -157,6 +159,7 @@ func getBindInterface(r *network.CreateNetworkRequest) (string, error) {
 	return "", nil
 }
 
+// NewDriver creates an OVN driver
 func NewDriver() (*Driver, error) {
 	docker, err := dockerclient.NewDockerClient("unix:///var/run/docker.sock", nil)
 	if err != nil {
@@ -191,6 +194,7 @@ func NewDriver() (*Driver, error) {
 	return d, nil
 }
 
+// AllocateNetwork allows a network
 func (d *Driver) AllocateNetwork(req *network.AllocateNetworkRequest) (*network.AllocateNetworkResponse, error) {
 	log.Debugf("Allocate network request: %+v", req)
 	res := &network.AllocateNetworkResponse{
@@ -199,16 +203,19 @@ func (d *Driver) AllocateNetwork(req *network.AllocateNetworkRequest) (*network.
 	return res, nil
 }
 
+// CreateEndpoint creates an logical switch port
 func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.CreateEndpointResponse, error) {
 	log.Debugf("Create endpoint request: %+v", req)
 	fmt.Println("Create endpoint request", req)
 	return nil, nil
 }
 
+// DeleteEndpoint deletes a logical switch port
 func (d *Driver) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
 	return nil
 }
 
+// CreateNetwork creates a logical switch
 func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
 	fmt.Printf("Create network request: %+v\n", req)
 
@@ -261,26 +268,32 @@ func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
 	return nil
 }
 
+// DeleteNetwork deletes the logical switch
 func (d *Driver) DeleteNetwork(req *network.DeleteNetworkRequest) error {
 	return nil
 }
 
+// DiscoverDelete is a notification for a discovery delete event, such as a node leaving a cluster
 func (d *Driver) DiscoverDelete(req *network.DiscoveryNotification) error {
 	return nil
 }
 
+// DiscoverNew is a notification for a new discovery event, such as a new node joining a cluster
 func (d *Driver) DiscoverNew(notif *network.DiscoveryNotification) error {
 	return nil
 }
 
+// EndpointInfo gets the endpoint info
 func (d *Driver) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
 	return nil, nil
 }
 
+// FreeNetwork frees a logical switch
 func (d *Driver) FreeNetwork(req *network.FreeNetworkRequest) error {
 	return nil
 }
 
+// GetCapabilities returns scope
 func (d *Driver) GetCapabilities() (*network.CapabilitiesResponse, error) {
 	res := &network.CapabilitiesResponse{
 		Scope: network.LocalScope,
@@ -288,18 +301,22 @@ func (d *Driver) GetCapabilities() (*network.CapabilitiesResponse, error) {
 	return res, nil
 }
 
+// Join is invoked when a Sandbox is attached to an endpoint.
 func (d *Driver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
 	return nil, nil
 }
 
+// Leave method is invoked when a Sandbox detaches from an endpoint.
 func (d *Driver) Leave(req *network.LeaveRequest) error {
 	return nil
 }
 
+// ProgramExternalConnectivity external
 func (d *Driver) ProgramExternalConnectivity(req *network.ProgramExternalConnectivityRequest) error {
 	return nil
 }
 
+// RevokeExternalConnectivity revokes
 func (d *Driver) RevokeExternalConnectivity(req *network.RevokeExternalConnectivityRequest) error {
 	return nil
 }
