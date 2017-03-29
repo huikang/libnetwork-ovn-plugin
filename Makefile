@@ -2,7 +2,7 @@
 
 all: build-local
 
-test: install-deps fmt # lint  vet
+test: install-deps fmt lint vet
 	@echo "+ $@"
 	@go test -race -v ./ ./ovn
 
@@ -34,7 +34,7 @@ fmt:
 
 vet:
 	@echo "+ $@"
-	@go vet ./...
+	@go vet ./ ./ovn
 
 clean:
 	@if [ -d bin ]; then \

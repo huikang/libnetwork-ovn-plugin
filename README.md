@@ -15,3 +15,14 @@ The OVN centralized controller includes a northbound database, a southbound data
 
 
 2. Start libnetwork OVN plugin
+
+        make
+        ./bin/libnetwork-ovn-plugin
+
+Create a network::
+
+        docker network create \
+                       --attachable \
+                       --driver ovn \
+                       --subnet=10.10.1.0/24 \
+                       --gateway=10.10.1.1 ovn-net

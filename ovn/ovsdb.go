@@ -3,10 +3,7 @@ package ovn
 import (
 	"errors"
 	"fmt"
-	_ "reflect"
-	_ "time"
 
-	_ "github.com/Sirupsen/logrus"
 	"github.com/socketplane/libovsdb"
 )
 
