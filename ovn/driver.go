@@ -306,7 +306,7 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 	d.endpoints[req.EndpointID] = es
 
 	if err := d.createEndpoint(bridgeName, logicalPortName); err != nil {
-		// delete(d.networks, req.NetworkID)
+		// delete(d.endpoints, req.EndpointID)
 		return nil, fmt.Errorf("ovn failed to create endpoint")
 	}
 
@@ -324,6 +324,24 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 
 // DeleteEndpoint deletes a logical switch port
 func (d *Driver) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
+	log.Infof("Delete endpoint request: %+v\n", req)
+
+	if _, ok := d.networks[req.NetworkID]; !ok {
+		return fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
+	}
+	bridgeName := d.networks[req.NetworkID].BridgeName
+	log.Infof("Bridge name: %s", bridgeName)
+
+	if _, ok := d.endpoints[req.EndpointID]; !ok {
+		return fmt.Errorf("failed to find endpoint for id [ %s ]", req.NetworkID)
+	}
+	endpointName := d.endpoints[req.EndpointID].LogicalPortName
+	log.Infof("Endpoint name: %s", endpointName)
+
+	if err := d.deleteEndpoint(bridgeName, endpointName); err != nil {
+		return fmt.Errorf("ovn failed to set endpoint addr")
+	}
+
 	return nil
 }
 

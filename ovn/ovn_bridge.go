@@ -86,9 +86,17 @@ func (ovnnber *ovnnber) addBridge(bridgeName string) error {
 	return nil
 }
 
-func (d *Driver) createEndpoint(bridgeName, logicalPortName string) error {
-	if err := d.ovnnber.addLogicalPort(bridgeName, logicalPortName); err != nil {
-		log.Errorf("error creating logical port [ %s ] on bridge [ %s ] : [ %s ]", logicalPortName, bridgeName, err)
+func (d *Driver) createEndpoint(bridgeName, endpointName string) error {
+	if err := d.ovnnber.addLogicalPort(bridgeName, endpointName); err != nil {
+		log.Errorf("error creating logical port [ %s ] on bridge [ %s ] : [ %s ]", endpointName, bridgeName, err)
+		return err
+	}
+	return nil
+}
+
+func (d *Driver) deleteEndpoint(bridgeName, logicalPortName string) error {
+	if err := d.ovnnber.delLogicalPort(bridgeName, logicalPortName); err != nil {
+		log.Errorf("error deleting logical port [ %s ] on bridge [ %s ] : [ %s ]", logicalPortName, bridgeName, err)
 		return err
 	}
 	return nil
@@ -99,6 +107,68 @@ func (d *Driver) setEndpointAddr(logicalPortName, ipaddr, macaddr string) error 
 		log.Errorf("error set logical port [ %s ] to [ %s ] : [ %s ]", logicalPortName, ipaddr, macaddr)
 		return err
 	}
+	return nil
+}
+
+func (ovnnber *ovnnber) delLogicalPort(switchName, logicalPortName string) error {
+	log.Infof("ovnnber deleting port [ %s ] on switch [ %s ]", logicalPortName, switchName)
+
+	// Achieve in two transactions:
+	// 1. find the UUID of the logicalport in the Logical_Switch_Port table
+	// 2. removing the uuid from the ports of that switch in the Logical_Switch table
+
+	condition := libovsdb.NewCondition("name", "==", logicalPortName)
+	selectOp := libovsdb.Operation{
+		Op:    "select",
+		Table: "Logical_Switch_Port",
+		// fixmehk: can not use _uuid due to any issue with libovsdb
+		// Columns: []string{"_uuid"},
+		Where: []interface{}{condition},
+	}
+
+	operations := []libovsdb.Operation{selectOp}
+	reply, _ := ovnnber.ovsdb.Transact("OVN_Northbound", operations...)
+
+	if len(reply) < len(operations) {
+		return errors.New("Number of Replies should be at least equal to number of Operations")
+	}
+
+	if reply[0].Error != "" {
+		return errors.New("Transaction Failed due to an error :" + reply[0].Error + " details : " + reply[0].Details)
+	}
+
+	// fixmehk: libovsdb can not return the _uuid of the selected row
+	//     see the issue of libovsdb:
+	//     https://github.com/socketplane/libovsdb/issues/45
+	portUUID := getRowUUID(reply[0].Rows[0])
+
+	// deleting an endpoint in the ports row in Logical_Switch table requires
+	mutateUUID := []libovsdb.UUID{
+		{GoUUID: portUUID},
+	}
+	mutateSet, _ := libovsdb.NewOvsSet(mutateUUID)
+	mutation := libovsdb.NewMutation("ports", "delete", mutateSet)
+	condition = libovsdb.NewCondition("name", "==", switchName)
+
+	mutateOp := libovsdb.Operation{
+		Op:        "mutate",
+		Table:     "Logical_Switch",
+		Mutations: []interface{}{mutation},
+		Where:     []interface{}{condition},
+	}
+
+	operations = []libovsdb.Operation{mutateOp}
+	reply, _ = ovnnber.ovsdb.Transact("OVN_Northbound", operations...)
+
+	if len(reply) < len(operations) {
+		log.Infof("uuid: %v", reply)
+		return errors.New("Number of Replies should be at least equal to number of Operations")
+	}
+
+	if reply[0].Error != "" {
+		return errors.New("Transaction Failed due to an error :" + reply[0].Error + " details : " + reply[0].Details)
+	}
+
 	return nil
 }
 
