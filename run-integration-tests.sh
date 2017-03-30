@@ -28,3 +28,7 @@ docker run \
 NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 --gateway=10.10.10.1 test1`
 docker network inspect $NID
 docker exec $cid ovn-nbctl show
+
+newcid=`docker run -d --net=$NID mrjana/golang sleep 100`
+docker inspect -f '{{json .NetworkSettings}}' $newcid | jq
+docker exec $cid ovn-nbctl show

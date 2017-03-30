@@ -2,6 +2,7 @@ package ovn
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -47,7 +48,8 @@ type dockerer struct {
 type Driver struct {
 	ovnnber
 	dockerer
-	networks map[string]*NetworkState
+	networks  map[string]*NetworkState
+	endpoints map[string]*EndpointState
 }
 
 // NetworkState is filled in at network creation time
@@ -59,6 +61,12 @@ type NetworkState struct {
 	Gateway           string
 	GatewayMask       string
 	FlatBindInterface string
+}
+
+// EndpointState is filled in at network creation time
+// it contains state that we wish to keep for each network
+type EndpointState struct {
+	LogicalPortName string
 }
 
 type ovnnber struct {
@@ -87,6 +95,11 @@ func getBridgeName(r *network.CreateNetworkRequest) (string, error) {
 		}
 	}
 	return bridgeName, nil
+}
+
+func getLogicalPortName(req *network.CreateEndpointRequest) string {
+	logicalPortName := "br" + truncateID(req.NetworkID) + "-" + truncateID(req.EndpointID)
+	return logicalPortName
 }
 
 func getBridgeMTU(r *network.CreateNetworkRequest) (int, error) {
@@ -159,6 +172,43 @@ func getBindInterface(r *network.CreateNetworkRequest) (string, error) {
 	return "", nil
 }
 
+func getBridgeNamefromresource(r *dockerclient.NetworkResource) (string, error) {
+	bridgeName := bridgePrefix + truncateID(r.ID)
+	if r.Options != nil {
+		if name, ok := r.Options[bridgeNameOption]; ok {
+			bridgeName = name
+		}
+	}
+	return bridgeName, nil
+}
+
+func getInterfaceInfo(req *network.CreateEndpointRequest) (ipaddr, mac string, err error) {
+	iface := req.Interface
+	if iface == nil {
+		return "", "", fmt.Errorf("request does not provide interface")
+	}
+
+	if iface.Address == "" {
+		return "", "", fmt.Errorf("interface does not provide address")
+	}
+
+	cidr, _, err := net.ParseCIDR(iface.Address)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid IPv4 CIDR [ %s ]", iface.Address)
+	}
+
+	if iface.MacAddress == "" {
+		mac = makeMac(cidr)
+		log.Infof("Random mac %s", mac)
+	} else {
+		mac = iface.MacAddress
+	}
+
+	ipaddr = cidr.String()
+
+	return ipaddr, mac, nil
+}
+
 // NewDriver creates an OVN driver
 func NewDriver() (*Driver, error) {
 	docker, err := dockerclient.NewDockerClient("unix:///var/run/docker.sock", nil)
@@ -189,7 +239,30 @@ func NewDriver() (*Driver, error) {
 		ovnnber: ovnnber{
 			ovsdb: ovnnb,
 		},
-		networks: make(map[string]*NetworkState),
+		networks:  make(map[string]*NetworkState),
+		endpoints: make(map[string]*EndpointState),
+	}
+	//recover networks
+	netlist, err := d.dockerer.client.ListNetworks("")
+	if err != nil {
+		return nil, fmt.Errorf("could not get  docker networks: %s", err)
+	}
+	for _, net := range netlist {
+		if net.Driver == DriverName {
+			netInspect, err := d.dockerer.client.InspectNetwork(net.ID)
+			if err != nil {
+				return nil, fmt.Errorf("could not inpect docker networks inpect: %s", err)
+			}
+			bridgeName, err := getBridgeNamefromresource(netInspect)
+			if err != nil {
+				return nil, err
+			}
+			ns := &NetworkState{
+				BridgeName: bridgeName,
+			}
+			d.networks[net.ID] = ns
+			log.Debugf("exist network create by this driver:%v", netInspect.Name)
+		}
 	}
 	return d, nil
 }
@@ -205,9 +278,48 @@ func (d *Driver) AllocateNetwork(req *network.AllocateNetworkRequest) (*network.
 
 // CreateEndpoint creates an logical switch port
 func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.CreateEndpointResponse, error) {
-	log.Debugf("Create endpoint request: %+v", req)
-	fmt.Println("Create endpoint request", req)
-	return nil, nil
+	log.Infof("Create endpoint request: %+v", req)
+
+	if _, ok := d.networks[req.NetworkID]; !ok {
+		return nil, fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
+	}
+	bridgeName := d.networks[req.NetworkID].BridgeName
+	log.Infof("Bridge name: %s", bridgeName)
+
+	logicalPortName := getLogicalPortName(req)
+	log.Infof("LogicalPort name: %s", logicalPortName)
+
+	ipaddr, macaddr, err := getInterfaceInfo(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interface [ %s ]", req.EndpointID)
+	}
+	log.Infof("Address %s mac %s", ipaddr, macaddr)
+
+	// process interface options
+
+	// 1. Create logical port in NB
+	// 1.1 ovn_nbctl("lsp-add", nid, eid)
+	// 1.2 ovn_nbctl("lsp-set-addresses", eid, mac_address + " " + ip_address)
+	es := &EndpointState{
+		LogicalPortName: logicalPortName,
+	}
+	d.endpoints[req.EndpointID] = es
+
+	if err := d.createEndpoint(bridgeName, logicalPortName); err != nil {
+		// delete(d.networks, req.NetworkID)
+		return nil, fmt.Errorf("ovn failed to create endpoint")
+	}
+
+	if err := d.setEndpointAddr(logicalPortName, ipaddr, macaddr); err != nil {
+		return nil, fmt.Errorf("ovn failed to set endpoint addr")
+	}
+
+	res := &network.CreateEndpointResponse{
+		Interface: &network.EndpointInterface{
+			MacAddress: macaddr,
+		},
+	}
+	return res, nil
 }
 
 // DeleteEndpoint deletes a logical switch port
@@ -285,6 +397,7 @@ func (d *Driver) DiscoverNew(notif *network.DiscoveryNotification) error {
 
 // EndpointInfo gets the endpoint info
 func (d *Driver) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
+	log.Infof("Request EndpointInfo %+v", req)
 	return nil, nil
 }
 
@@ -303,6 +416,7 @@ func (d *Driver) GetCapabilities() (*network.CapabilitiesResponse, error) {
 
 // Join is invoked when a Sandbox is attached to an endpoint.
 func (d *Driver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
+	log.Infof("Join request: %+v", req)
 	return nil, nil
 }
 
