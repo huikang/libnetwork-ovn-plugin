@@ -7,6 +7,11 @@ import (
 	"github.com/socketplane/libovsdb"
 )
 
+const (
+	ovsdbPort = 6640
+	ovnNBPort = 6641
+)
+
 func (ovnnber *ovnnber) bridgeExists(portName string) (bool, error) {
 	condition := libovsdb.NewCondition("name", "==", portName)
 	selectOp := libovsdb.Operation{
