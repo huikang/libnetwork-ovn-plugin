@@ -60,6 +60,7 @@ func (ovnnber *ovnnber) endpointpointExists(endpointName string) (bool, error) {
 // getRowUUID extracts the uuid of the input row
 func getRowUUID(columns map[string]interface{}) (uuid string) {
 	// uuid has fixed format: e.g., [uuid fdfb4bdd-08ee-453e-849e-8ef8d2116a82]
-	s := fmt.Sprintf("%s", columns["_uuid"])
-	return s[6:(len(s) - 1)]
+	u := columns["_uuid"].([]interface{})
+	k := u[1].(string)
+	return k
 }
