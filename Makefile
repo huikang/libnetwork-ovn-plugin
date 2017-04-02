@@ -4,7 +4,7 @@ all: build-local
 
 test: install-deps fmt lint vet
 	@echo "+ $@"
-	@go test -race -v ./ ./ovn
+	@go test -race -v
 
 test-ci:
 	@echo "+ $@"
