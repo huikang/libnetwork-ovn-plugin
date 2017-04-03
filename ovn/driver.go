@@ -18,6 +18,8 @@ const (
 	DriverName          = "ovn"
 	localhost           = "127.0.0.1"
 	bridgePrefix        = "ovnbr-"
+	ovnbridge           = "br-int"
+	containerEthName    = "eth"
 	bridgeNameOption    = "net.libnetwork.ovn.bridge.name"
 	bindInterfaceOption = "net.libnetwork.ovn.bridge.bind_interface"
 
@@ -29,8 +31,6 @@ const (
 
 	defaultMTU  = 1500
 	defaultMode = modeNAT
-
-	ovnNBPort = 6641
 )
 
 var (
@@ -47,6 +47,7 @@ type dockerer struct {
 // Driver is ovn driver strcut
 type Driver struct {
 	ovnnber
+	ovsdber
 	dockerer
 	networks  map[string]*NetworkState
 	endpoints map[string]*EndpointState
@@ -67,9 +68,17 @@ type NetworkState struct {
 // it contains state that we wish to keep for each network
 type EndpointState struct {
 	LogicalPortName string
+	addr            string
+	mac             string
+	vethOut         string
+	vethIn          string
 }
 
 type ovnnber struct {
+	ovsdb *libovsdb.OvsdbClient
+}
+
+type ovsdber struct {
 	ovsdb *libovsdb.OvsdbClient
 }
 
@@ -216,7 +225,7 @@ func NewDriver() (*Driver, error) {
 		return nil, fmt.Errorf("could not connect to docker: %s", err)
 	}
 
-	// initiate the ovsdb manager port binding
+	// initiate the ovn-nb manager port binding
 	var ovnnb *libovsdb.OvsdbClient
 	retries := 3
 	for i := 0; i < retries; i++ {
@@ -232,12 +241,31 @@ func NewDriver() (*Driver, error) {
 		return nil, fmt.Errorf("could not connect to OVN Northbound")
 	}
 
+	// initiate the ovsdb manager port binding
+	var ovsdb *libovsdb.OvsdbClient
+	retries = 3
+	for i := 0; i < retries; i++ {
+		ovsdb, err = libovsdb.Connect(localhost, ovsdbPort)
+		if err == nil {
+			break
+		}
+		log.Errorf("could not connect to OVSDB on port [ %d ]: %s. Retrying in 5 seconds", ovsdbPort, err)
+		time.Sleep(5 * time.Second)
+	}
+
+	if ovsdb == nil {
+		return nil, fmt.Errorf("could not connect to OVSDB")
+	}
+
 	d := &Driver{
 		dockerer: dockerer{
 			client: docker,
 		},
 		ovnnber: ovnnber{
 			ovsdb: ovnnb,
+		},
+		ovsdber: ovsdber{
+			ovsdb: ovsdb,
 		},
 		networks:  make(map[string]*NetworkState),
 		endpoints: make(map[string]*EndpointState),
@@ -264,6 +292,11 @@ func NewDriver() (*Driver, error) {
 			log.Debugf("exist network create by this driver:%v", netInspect.Name)
 		}
 	}
+
+	// fixmehk: add the following setup
+	// ovs_vsctl("set", "open_vswitch", ".",
+	//	"external_ids:ovn-bridge=" + OVN_BRIDGE); OVN_BRIDGE=br-int
+
 	return d, nil
 }
 
@@ -302,6 +335,8 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 	// 1.2 ovn_nbctl("lsp-set-addresses", eid, mac_address + " " + ip_address)
 	es := &EndpointState{
 		LogicalPortName: logicalPortName,
+		addr:            ipaddr,
+		mac:             macaddr,
 	}
 	d.endpoints[req.EndpointID] = es
 
@@ -324,7 +359,7 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 
 // DeleteEndpoint deletes a logical switch port
 func (d *Driver) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
-	log.Infof("Delete endpoint request: %+v\n", req)
+	log.Infof("Delete endpoint request: %+v", req)
 
 	if _, ok := d.networks[req.NetworkID]; !ok {
 		return fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
@@ -416,7 +451,22 @@ func (d *Driver) DiscoverNew(notif *network.DiscoveryNotification) error {
 // EndpointInfo gets the endpoint info
 func (d *Driver) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
 	log.Infof("Request EndpointInfo %+v", req)
-	return nil, nil
+	if _, ok := d.endpoints[req.EndpointID]; !ok {
+		return nil, fmt.Errorf("failed to find endpoint for id [ %s ]", req.NetworkID)
+	}
+	ep := d.endpoints[req.EndpointID]
+
+	log.Infof("Request EndpointInfo [ %s %s %s]", ep.addr, ep.mac, ep.vethOut)
+
+	resMap := map[string]string{
+		"ip_address":   ep.addr,
+		"mac_address":  ep.mac,
+		"veth_outside": ep.vethOut,
+	}
+	res := &network.InfoResponse{
+		Value: resMap,
+	}
+	return res, nil
 }
 
 // FreeNetwork frees a logical switch
@@ -435,11 +485,78 @@ func (d *Driver) GetCapabilities() (*network.CapabilitiesResponse, error) {
 // Join is invoked when a Sandbox is attached to an endpoint.
 func (d *Driver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
 	log.Infof("Join request: %+v", req)
-	return nil, nil
+
+	if _, ok := d.networks[req.NetworkID]; !ok {
+		return nil, fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
+	}
+	bridgeName := d.networks[req.NetworkID].BridgeName
+	log.Infof("Bridge name: %s", bridgeName)
+
+	if _, ok := d.endpoints[req.EndpointID]; !ok {
+		return nil, fmt.Errorf("failed to find endpoint for id [ %s ]", req.NetworkID)
+	}
+	ep := d.endpoints[req.EndpointID]
+	log.Infof("Endpoint name: %s [%s %s]", ep.LogicalPortName, ep.mac, ep.addr)
+
+	if req.SandboxKey == "" {
+		return nil, fmt.Errorf("failed to find get sandbox key in req")
+	}
+	sboxkey := req.SandboxKey
+	log.Infof("Sandbox key: %s", sboxkey)
+	s := strings.Split(sboxkey, "/")
+	cnid := s[len(s)-1]
+	log.Infof("Sandbox cni key: %s", cnid)
+
+	vethOut := req.EndpointID[0:15]
+	vethIn := req.EndpointID[0:13] + "_c"
+	if err := createVethPair(vethOut, vethIn, ep.mac); err != nil {
+		return nil, fmt.Errorf("failed to create veth pair")
+	}
+	ep.vethOut = vethOut
+	ep.vethIn = vethIn
+	log.Debugf("Created veth %s:%s", ep.vethOut, ep.vethIn)
+
+	// ovs_vsctl("add-port", OVN_BRIDGE, veth_outside)
+	// ovs_vsctl("set", "interface", veth_outside,
+	//	"external_ids:attached-mac=" + mac_address,
+	//	"external_ids:iface-id=" + eid,
+	//	"external_ids:vm-id=" + vm_id,
+	//	"external_ids:iface-status=active")
+	if err := d.addVethPort(ovnbridge, vethOut, ep.mac, req.EndpointID, cnid); err != nil {
+		return nil, fmt.Errorf("ovn failed to join endpoint [ %s ] to sb [ %s ]", vethOut, sboxkey)
+	}
+
+	res := &network.JoinResponse{
+		InterfaceName: network.InterfaceName{
+			SrcName:   ep.vethIn,
+			DstPrefix: containerEthName,
+		},
+		Gateway: d.networks[req.NetworkID].Gateway,
+	}
+	log.Debugf("Join endpoint %s:%s to %s", req.NetworkID, req.EndpointID, req.SandboxKey)
+
+	return res, nil
 }
 
 // Leave method is invoked when a Sandbox detaches from an endpoint.
 func (d *Driver) Leave(req *network.LeaveRequest) error {
+	log.Infof("Leave request: %+v", req)
+
+	if _, ok := d.networks[req.NetworkID]; !ok {
+		return fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
+	}
+	bridgeName := d.networks[req.NetworkID].BridgeName
+	log.Infof("Bridge name: %s", bridgeName)
+
+	if _, ok := d.endpoints[req.EndpointID]; !ok {
+		return fmt.Errorf("failed to find endpoint for id [ %s ]", req.NetworkID)
+	}
+	ep := d.endpoints[req.EndpointID]
+	log.Infof("Endpoint name: %s [%s %s %s]", ep.LogicalPortName, ep.mac, ep.addr, ep.vethOut)
+
+	// command = "ip link delete %s" % (veth_outside)
+
+	// ovs_vsctl("--if-exists", "del-port", veth_outside)
 	return nil
 }
 

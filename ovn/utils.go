@@ -6,6 +6,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libnetwork/ns"
 	"github.com/vishvananda/netlink"
 )
 
@@ -94,4 +95,45 @@ func validateIface(ifaceStr string) bool {
 		return false
 	}
 	return true
+}
+
+func createVethPair(vethOut, vethIn, mac string) error {
+	log.Infof("Create veth [%s %s]", vethOut, vethIn)
+
+	nlh := ns.NlHandle()
+
+	// Generate and add the interface pipe host <-> sandbox
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{Name: vethOut, TxQLen: 0},
+		PeerName:  vethIn}
+	fmt.Println("type:", veth.Type())
+
+	if err := nlh.LinkAdd(veth); err != nil {
+		return fmt.Errorf("error creating veth pair: %v", err)
+	}
+
+	// command = "ip link set dev %s address %s" % (veth_inside, mac_address)
+	l, err := nlh.LinkByName(vethIn)
+	if err != nil {
+		return fmt.Errorf("failed to get link by name %s : %s", vethIn, err.Error())
+	}
+
+	hwAddr, err := net.ParseMAC(mac)
+	if err != nil {
+		return fmt.Errorf("failed to parse mac %s : %s", mac, err.Error())
+	}
+
+	if err := nlh.LinkSetHardwareAddr(l, hwAddr); err != nil {
+		return fmt.Errorf("failed to set bridge mac-address %s : %s", hwAddr, err.Error())
+	}
+
+	// command = "ip link set %s up" % (veth_outside)
+	l, err = nlh.LinkByName(vethOut)
+	if err != nil {
+		return fmt.Errorf("failed to get link by name %s : %s", vethIn, err.Error())
+	}
+	if err := nlh.LinkSetUp(l); err != nil {
+		return fmt.Errorf("failed to set link up %s", err.Error())
+	}
+	return nil
 }

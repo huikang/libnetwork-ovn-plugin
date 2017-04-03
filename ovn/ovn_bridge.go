@@ -2,6 +2,7 @@ package ovn
 
 import (
 	"errors"
+	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/socketplane/libovsdb"
@@ -82,6 +83,19 @@ func (ovnnber *ovnnber) addBridge(bridgeName string) error {
 		if !exists {
 			return errors.New("Error creating Bridge")
 		}
+	}
+	return nil
+}
+
+func (d *Driver) addVethPort(bridgeName, vethOut, mac, eid, cnid string) error {
+	if err := d.ovsdber.addOvsVethPort(bridgeName, vethOut, mac); err != nil {
+		log.Errorf("error add ovs veth port [ %s %s ] on bridge [ %s ]", vethOut, mac, bridgeName)
+		return err
+	}
+
+	if err := d.ovsdber.bindVeth(vethOut, mac, eid, cnid); err != nil {
+		log.Errorf("error bind veth [ %s %s ] eid [ %s ] on bridge [ %s ]", vethOut, mac, eid, bridgeName)
+		return err
 	}
 	return nil
 }
@@ -254,6 +268,112 @@ func (ovnnber *ovnnber) addLogicalPort(switchName, logicalPortName string) error
 	}
 
 	log.Infof("Added port")
+
+	return nil
+}
+
+func (ovsdber *ovsdber) bindVeth(vethOut, mac, eid, cnid string) error {
+	log.Infof("bind veth [ %s %s ]", vethOut, eid)
+	// 2. ovs_vsctl("set", "interface", veth_outside,
+	//        "external_ids:attached-mac=" + mac_address,
+	//        "external_ids:iface-id=" + eid,
+	//        "external_ids:vm-id=" + vm_id,
+	//        "external_ids:iface-status=active")
+
+	gomap := make(map[interface{}]interface{})
+	gomap["attached-map"] = mac
+	gomap["iface-id"] = eid
+	gomap["vm-id"] = cnid
+	gomap["iface-status"] = "active"
+	mutateMap, _ := libovsdb.NewOvsMap(gomap)
+	mutation := libovsdb.NewMutation("external_ids", "insert", mutateMap)
+	condition := libovsdb.NewCondition("name", "==", vethOut)
+
+	// Mutate operation
+	mutateOp := libovsdb.Operation{
+		Op:        "mutate",
+		Table:     "Interface",
+		Mutations: []interface{}{mutation},
+		Where:     []interface{}{condition},
+	}
+	operations := []libovsdb.Operation{mutateOp}
+	reply, _ := ovsdber.ovsdb.Transact("Open_vSwitch", operations...)
+
+	if len(reply) < len(operations) {
+		log.Error("Number of Replies should be atleast equal to number of Operations")
+	}
+	for i, o := range reply {
+		if o.Error != "" && i < len(operations) {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		} else if o.Error != "" {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		}
+	}
+	return nil
+}
+
+func (ovsdber *ovsdber) addOvsVethPort(bridgeName, vethOut, mac string) error {
+	// 1. ovs_vsctl("add-port", OVN_BRIDGE, veth_outside)
+	fmt.Printf("Added port [ %s ] to switch [  %s ]", vethOut, bridgeName)
+
+	namedPortUUID := "port"
+	namedIntfUUID := "intf"
+
+	// intf row to insert
+	intf := make(map[string]interface{})
+	intf["name"] = vethOut
+	intf["type"] = `system`
+
+	insertIntfOp := libovsdb.Operation{
+		Op:       "insert",
+		Table:    "Interface",
+		Row:      intf,
+		UUIDName: namedIntfUUID,
+	}
+
+	// port row to insert
+	port := make(map[string]interface{})
+	port["name"] = vethOut
+	port["interfaces"] = libovsdb.UUID{
+		GoUUID: namedIntfUUID,
+	}
+
+	insertPortOp := libovsdb.Operation{
+		Op:       "insert",
+		Table:    "Port",
+		Row:      port,
+		UUIDName: namedPortUUID,
+	}
+	// Inserting a row in Port table requires mutating the bridge table.
+	mutateUUID := []libovsdb.UUID{
+		{GoUUID: namedPortUUID},
+	}
+	mutateSet, _ := libovsdb.NewOvsSet(mutateUUID)
+	mutation := libovsdb.NewMutation("ports", "insert", mutateSet)
+	condition := libovsdb.NewCondition("name", "==", bridgeName)
+
+	// Mutate operation
+	mutateOp := libovsdb.Operation{
+		Op:        "mutate",
+		Table:     "Bridge",
+		Mutations: []interface{}{mutation},
+		Where:     []interface{}{condition},
+	}
+	operations := []libovsdb.Operation{insertIntfOp, insertPortOp, mutateOp}
+	reply, _ := ovsdber.ovsdb.Transact("Open_vSwitch", operations...)
+
+	if len(reply) < len(operations) {
+		fmt.Println(len(reply))
+		fmt.Println(reply)
+		log.Error("Number of Replies should be atleast equal to number of Operations")
+	}
+	for i, o := range reply {
+		if o.Error != "" && i < len(operations) {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		} else if o.Error != "" {
+			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
+		}
+	}
 
 	return nil
 }
