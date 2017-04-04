@@ -2,7 +2,7 @@
 
 echo "Start OVN centralized controller"
 
-cid=$(docker run -itd --net=host --cap-add NET_ADMIN --cap-add SYS_MODULE -v /lib/modules:/lib/modules --name ovn-central huikang/openvswitch:2.7.0)
+cid=$(docker run -itd --net=host --privileged -v /lib/modules:/lib/modules --name ovn-central huikang/openvswitch:2.7.0)
 
 if [ $? -eq 0 ]; then
     echo "Started openvswitch container $cid"
