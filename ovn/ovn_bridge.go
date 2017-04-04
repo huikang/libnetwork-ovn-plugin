@@ -87,14 +87,14 @@ func (ovnnber *ovnnber) addBridge(bridgeName string) error {
 	return nil
 }
 
-func (d *Driver) addVethPort(bridgeName, vethOut, mac, eid, cnid string) error {
+func (d *Driver) addVethPort(bridgeName, vethOut, mac, portName, cnid string) error {
 	if err := d.ovsdber.addOvsVethPort(bridgeName, vethOut, mac); err != nil {
 		log.Errorf("error add ovs veth port [ %s %s ] on bridge [ %s ]", vethOut, mac, bridgeName)
 		return err
 	}
 
-	if err := d.ovsdber.bindVeth(vethOut, mac, eid, cnid); err != nil {
-		log.Errorf("error bind veth [ %s %s ] eid [ %s ] on bridge [ %s ]", vethOut, mac, eid, bridgeName)
+	if err := d.ovsdber.bindVeth(vethOut, mac, portName, cnid); err != nil {
+		log.Errorf("error bind veth [ %s %s ] eid [ %s ] on bridge [ %s ]", vethOut, mac, portName, bridgeName)
 		return err
 	}
 	return nil
@@ -272,8 +272,8 @@ func (ovnnber *ovnnber) addLogicalPort(switchName, logicalPortName string) error
 	return nil
 }
 
-func (ovsdber *ovsdber) bindVeth(vethOut, mac, eid, cnid string) error {
-	log.Infof("bind veth [ %s %s ]", vethOut, eid)
+func (ovsdber *ovsdber) bindVeth(vethOut, mac, portName, cnid string) error {
+	log.Infof("bind veth [ %s %s ]", vethOut, portName)
 	// 2. ovs_vsctl("set", "interface", veth_outside,
 	//        "external_ids:attached-mac=" + mac_address,
 	//        "external_ids:iface-id=" + eid,
@@ -282,7 +282,7 @@ func (ovsdber *ovsdber) bindVeth(vethOut, mac, eid, cnid string) error {
 
 	gomap := make(map[interface{}]interface{})
 	gomap["attached-map"] = mac
-	gomap["iface-id"] = eid
+	gomap["iface-id"] = portName
 	gomap["vm-id"] = cnid
 	gomap["iface-status"] = "active"
 	mutateMap, _ := libovsdb.NewOvsMap(gomap)
