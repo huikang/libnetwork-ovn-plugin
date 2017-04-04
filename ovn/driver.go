@@ -522,7 +522,7 @@ func (d *Driver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
 	//	"external_ids:iface-id=" + eid,
 	//	"external_ids:vm-id=" + vm_id,
 	//	"external_ids:iface-status=active")
-	if err := d.addVethPort(ovnbridge, vethOut, ep.mac, req.EndpointID, cnid); err != nil {
+	if err := d.addVethPort(ovnbridge, vethOut, ep.mac, ep.LogicalPortName, cnid); err != nil {
 		return nil, fmt.Errorf("ovn failed to join endpoint [ %s ] to sb [ %s ]", vethOut, sboxkey)
 	}
 
