@@ -29,9 +29,9 @@ docker run \
        -v $(pwd)/:/go/src/github.ibm.com/kangh/libnetwork-ovn-plugin \
        -w /go/src/github.ibm.com/kangh/libnetwork-ovn-plugin \
        -v /run:/run \
-       mrjana/golang ./bin/libnetwork-ovn-plugin
+       mrjana/golang ./bin/libnetwork-ovn-plugin -d
 
-NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 --gateway=10.10.10.1 test1`
+NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 test1`
 docker network inspect $NID
 docker exec $cidovs ovn-nbctl show
 
