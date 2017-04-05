@@ -208,7 +208,6 @@ func getInterfaceInfo(req *network.CreateEndpointRequest) (ipaddr, mac string, e
 
 	if iface.MacAddress == "" {
 		mac = makeMac(cidr)
-		log.Infof("Random mac %s", mac)
 	} else {
 		mac = iface.MacAddress
 	}
@@ -317,18 +316,16 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 		return nil, fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
 	}
 	bridgeName := d.networks[req.NetworkID].BridgeName
-	log.Infof("Bridge name: %s", bridgeName)
+	log.Debugf("Bridge name: [ %s ]", bridgeName)
 
 	logicalPortName := getLogicalPortName(req)
-	log.Infof("LogicalPort name: %s", logicalPortName)
+	log.Debugf("LogicalPort name: [ %s ]", logicalPortName)
 
 	ipaddr, macaddr, err := getInterfaceInfo(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get interface [ %s ]", req.EndpointID)
 	}
-	log.Infof("Address %s mac %s", ipaddr, macaddr)
-
-	// process interface options
+	log.Debugf("Interface addr [ %s ] mac [ %s ]", ipaddr, macaddr)
 
 	// 1. Create logical port in NB
 	// 1.1 ovn_nbctl("lsp-add", nid, eid)
@@ -341,7 +338,7 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 	d.endpoints[req.EndpointID] = es
 
 	if err := d.createEndpoint(bridgeName, logicalPortName); err != nil {
-		// delete(d.endpoints, req.EndpointID)
+		delete(d.endpoints, req.EndpointID)
 		return nil, fmt.Errorf("ovn failed to create endpoint")
 	}
 
@@ -354,6 +351,7 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 			MacAddress: macaddr,
 		},
 	}
+	log.Infof("Created logical port [ %s ] for endpoint id [ %v ]", es.LogicalPortName, req.EndpointID)
 	return res, nil
 }
 
@@ -382,37 +380,37 @@ func (d *Driver) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
 
 // CreateNetwork creates a logical switch
 func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
-	fmt.Printf("Create network request: %+v\n", req)
+	log.Infof("Create network request: %+v\n", req)
 
 	bridgeName, err := getBridgeName(req)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Bridge name:", bridgeName)
+	log.Debugf("Bridge name: [ %s ]", bridgeName)
 
 	mtu, err := getBridgeMTU(req)
 	if err != nil {
 		return err
 	}
-	fmt.Println("MTU:", mtu)
+	log.Debugf("MTU: [ %v ]", mtu)
 
 	mode, err := getBridgeMode(req)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Mode:", mode)
+	log.Debugf("Mode: [ %v ]", mode)
 
 	gateway, mask, err := getGatewayIP(req)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Gateway mask:", gateway, mask)
+	log.Debugf("Gateway mask: [ %v/%v ]", gateway, mask)
 
 	bindInterface, err := getBindInterface(req)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Bindinterface:", bindInterface)
+	log.Debugf("Bindinterface: [ %v ]", bindInterface)
 
 	ns := &NetworkState{
 		BridgeName:        bridgeName,
@@ -425,11 +423,12 @@ func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
 
 	d.networks[req.NetworkID] = ns
 
-	log.Infof("Initializing bridge for network %s", req.NetworkID)
+	log.Debugf("Initializing bridge for network %s", req.NetworkID)
 	if err := d.initBridge(req.NetworkID); err != nil {
 		delete(d.networks, req.NetworkID)
 		return err
 	}
+	log.Infof("Created logical bridge [ %s ] for network id [ %v ]", ns.BridgeName, req.NetworkID)
 	return nil
 }
 

@@ -10,7 +10,6 @@ import (
 
 //  setupBridge If bridge does not exist create it.
 func (d *Driver) initBridge(id string) error {
-	log.Infof("initBridge id: %s\n", id)
 	bridgeName := d.networks[id].BridgeName
 	if err := d.ovnnber.addBridge(bridgeName); err != nil {
 		log.Errorf("error creating logical bridge [ %s ] : [ %s ]", bridgeName, err)
@@ -30,9 +29,6 @@ func (ovnnber *ovnnber) createBridgeIface(name string) error {
 
 // createOvsdbBridge creates the OVS bridge
 func (ovnnber *ovnnber) createLogicalBridge(bridgeName string) error {
-
-	log.Infof("createLogcialBridge %s\n", bridgeName)
-
 	namedBridgeUUID := "bridge"
 
 	// Bridge row to insert
@@ -59,11 +55,14 @@ func (ovnnber *ovnnber) createLogicalBridge(bridgeName string) error {
 			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
 		}
 	}
+
+	log.Debugf("Created OVN logical bridge [ %s ]", bridgeName)
 	return nil
 }
 
 // Check if port exists prior to creating a bridge
 func (ovnnber *ovnnber) addBridge(bridgeName string) error {
+	log.Debugf("Create OVN logical bridge [ %s ]", bridgeName)
 	if ovnnber.ovsdb == nil {
 		return errors.New("OVS not connected")
 	}
@@ -266,8 +265,7 @@ func (ovnnber *ovnnber) addLogicalPort(switchName, logicalPortName string) error
 			return errors.New("Transaction Failed due to an error :" + o.Error + " details : " + o.Details)
 		}
 	}
-
-	log.Infof("Added port")
+	log.Debugf("Added logical port [ %s ] to logical switch [ %s ]", logicalPortName, switchName)
 
 	return nil
 }
