@@ -12,7 +12,7 @@ test-ci:
 	make build-local
 	@./run-integration-tests.sh
 
-build-local:
+build-local: install-deps
 	@mkdir -p "bin"
 	go build -o "bin/libnetwork-ovn-plugin" ./
 
