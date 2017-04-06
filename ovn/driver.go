@@ -551,11 +551,24 @@ func (d *Driver) Leave(req *network.LeaveRequest) error {
 		return fmt.Errorf("failed to find endpoint for id [ %s ]", req.NetworkID)
 	}
 	ep := d.endpoints[req.EndpointID]
-	log.Infof("Endpoint name: %s [%s %s %s]", ep.LogicalPortName, ep.mac, ep.addr, ep.vethOut)
+	log.Debugf("Endpoint name: %s [%s %s %s]", ep.LogicalPortName, ep.mac, ep.addr, ep.vethOut)
 
 	// command = "ip link delete %s" % (veth_outside)
+	iface, err := netlink.LinkByName(ep.vethOut)
+	if err != nil {
+		return fmt.Errorf("Error retrieving a link named [ %s ]", iface.Attrs().Name)
+	}
+	if err := netlink.LinkDel(iface); err != nil {
+		log.Errorf("unable to delete veth on leave: %s", err)
+	}
+	log.Infof("Deleted link veth [ %s ]", ep.vethOut)
 
 	// ovs_vsctl("--if-exists", "del-port", veth_outside)
+	if err := d.ovsdber.deletePort(ovnbridge, ep.vethOut); err != nil {
+		return fmt.Errorf("ovs failed to delete port")
+	}
+	delete(d.endpoints, req.EndpointID)
+	log.Infof("Deleted port [ %s ] on OVN bridge [ %v ]", ep.LogicalPortName, ovnbridge)
 	return nil
 }
 
