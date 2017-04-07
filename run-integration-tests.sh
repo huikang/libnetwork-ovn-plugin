@@ -64,7 +64,7 @@ docker exec $cidovs ovn-nbctl show
 # Create two containers and connect them to the logical switch. These two
 # containera can ping each other
 cid1=`docker run -d --net=$NID mrjana/golang sleep 100`
-docker inspect -f '{{json .NetworkSettings}}' $cid1 | jq
+cid1IP=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $cid1`
 docker exec $cid1 ip a
 # check logical port is added to ovsdb
 get_sboxkey $cid1 sbkey1
@@ -81,12 +81,13 @@ docker exec $cidovs ovn-nbctl show
 docker exec $cidovs ovs-ofctl dump-flows br-int
 
 cid2=`docker run -d --net=$NID mrjana/golang sleep 100`
+cid2IP=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $cid2`
 docker inspect -f '{{json .NetworkSettings}}' $cid2 | jq
 
-docker exec $cid1 ping 10.10.10.2 -c 2
-docker exec $cid1 ping 10.10.10.3 -c 2
-docker exec $cid2 ping 10.10.10.2 -c 2
-docker exec $cid2 ping 10.10.10.3 -c 2
+docker exec $cid1 ping $cid1IP -c 2
+docker exec $cid1 ping $cid2IP -c 2
+docker exec $cid2 ping $cid1IP -c 2
+docker exec $cid2 ping $cid1IP -c 2
 
 # clean up containers and make sure the associated resources are cleanup in
 # OVSDB
