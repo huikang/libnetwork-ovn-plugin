@@ -181,6 +181,11 @@ func getBindInterface(r *network.CreateNetworkRequest) (string, error) {
 	return "", nil
 }
 
+func getLogicalPortNamefromresource(nid, eid string) string {
+	logicalPortName := "br" + truncateID(nid) + "-" + truncateID(eid)
+	return logicalPortName
+}
+
 func getBridgeNamefromresource(r *dockerclient.NetworkResource) (string, error) {
 	bridgeName := bridgePrefix + truncateID(r.ID)
 	if r.Options != nil {
@@ -269,7 +274,7 @@ func NewDriver() (*Driver, error) {
 		networks:  make(map[string]*NetworkState),
 		endpoints: make(map[string]*EndpointState),
 	}
-	//recover networks
+	//recover networks and endpoints
 	netlist, err := d.dockerer.client.ListNetworks("")
 	if err != nil {
 		return nil, fmt.Errorf("could not get  docker networks: %s", err)
@@ -289,13 +294,25 @@ func NewDriver() (*Driver, error) {
 			}
 			d.networks[net.ID] = ns
 			log.Debugf("exist network create by this driver:%v", netInspect.Name)
+
+			for c, ep := range netInspect.Containers {
+				log.Debugf("Container name: %v eid %v", c, ep)
+				logicalPortName := getLogicalPortNamefromresource(net.ID, ep.EndpointID)
+				es := &EndpointState{
+					LogicalPortName: logicalPortName,
+					addr:            ep.IPv4Address,
+					mac:             ep.MacAddress,
+					vethOut:         ep.EndpointID[0:15],
+				}
+				d.endpoints[ep.EndpointID] = es
+				log.Debugf("exist endpoint: %v", d.endpoints[ep.EndpointID])
+			}
 		}
 	}
 
 	// fixmehk: add the following setup
 	// ovs_vsctl("set", "open_vswitch", ".",
 	//	"external_ids:ovn-bridge=" + OVN_BRIDGE); OVN_BRIDGE=br-int
-
 	return d, nil
 }
 
