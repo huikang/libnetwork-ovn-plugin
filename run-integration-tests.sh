@@ -45,17 +45,20 @@ sudo rmmod openvswitch
 sudo modprobe tun
 docker exec $cidovs sh -c "ovs-vsctl set bridge br-int datapath_type=netdev"
 
-echo "Start ovn plugin"
-docker run \
-       -d \
-       --hostname=ovn-plugin \
-       --name=ovn-plugin \
-       --net=host \
-       --privileged \
-       -v $(pwd)/:/go/src/github.ibm.com/kangh/libnetwork-ovn-plugin \
-       -w /go/src/github.ibm.com/kangh/libnetwork-ovn-plugin \
-       -v /run:/run \
-       mrjana/golang ./bin/libnetwork-ovn-plugin -d
+function start_ovn_plugin {
+    echo "Start ovn plugin"
+    docker run \
+	-d \
+	--hostname=ovn-plugin \
+	--name=ovn-plugin \
+	--net=host \
+	--privileged \
+	-v $(pwd)/:/go/src/github.ibm.com/kangh/libnetwork-ovn-plugin \
+	-w /go/src/github.ibm.com/kangh/libnetwork-ovn-plugin \
+	-v /run:/run \
+	mrjana/golang ./bin/libnetwork-ovn-plugin -d
+}
+start_ovn_plugin
 
 NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 test1`
 docker network inspect $NID
@@ -71,7 +74,7 @@ get_sboxkey $cid1 sbkey1
 exist_logical_port $sbkey1
 if [ $? -eq 0 ]
 then
-    echo "found logcal port in ovsdb"
+    echo "found logical port in ovsdb"
 else
     echo "No logical port"
 fi
@@ -83,6 +86,7 @@ docker exec $cidovs ovs-ofctl dump-flows br-int
 cid2=`docker run -d --net=$NID mrjana/golang sleep 100`
 cid2IP=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $cid2`
 docker inspect -f '{{json .NetworkSettings}}' $cid2 | jq
+get_sboxkey $cid2 sbkey2
 
 docker exec $cid1 ping $cid1IP -c 2
 docker exec $cid1 ping $cid2IP -c 2
@@ -98,9 +102,27 @@ set +o errexit
 exist_logical_port $sbkey1
 if [ $? -eq 0 ]
 then
-    echo "Found logcal port in ovsdb, but container $cid1 has been removed"
+    echo "Found logical port in ovsdb, but container $cid1 has been removed"
     exit 1
 else
     echo "No logical port"
 fi
 set -o errexit
+
+# restart ovn plugin
+docker rm -f ovn-plugin
+start_ovn_plugin
+docker rm -f $cid2
+
+set +o errexit
+exist_logical_port $sbkey2
+if [ $? -eq 0 ]
+then
+    echo "Found logical port in ovsdb, but container $cid2 has been removed"
+    exit 1
+else
+    echo "No logical port"
+fi
+set -o errexit
+# Should not show any veth interface
+sudo ip a
