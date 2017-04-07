@@ -493,7 +493,7 @@ func (d *Driver) FreeNetwork(req *network.FreeNetworkRequest) error {
 // GetCapabilities returns scope
 func (d *Driver) GetCapabilities() (*network.CapabilitiesResponse, error) {
 	res := &network.CapabilitiesResponse{
-		Scope: network.LocalScope,
+		Scope: network.GlobalScope,
 	}
 	return res, nil
 }

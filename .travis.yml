@@ -14,6 +14,9 @@ addons:
       - libhunspell-dev
       - libsystemd-journal-dev
 
+env:
+ - DOCKER_OPTS="--cluster-store=consul://127.0.0.1:8500 --cluster-advertise=eth0:2376"
+
 before_install:
  - go get -v -u github.com/chzchzchz/goword
  - go get -v -u honnef.co/go/tools/cmd/gosimple

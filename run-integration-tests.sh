@@ -29,10 +29,24 @@ function get_sboxkey() {
     ret=$sbkey
 }
 
+function setup_consul {
+    wget https://releases.hashicorp.com/consul/0.5.2/consul_0.5.2_linux_amd64.zip
+    unzip consul_0.5.2_linux_amd64.zip
+    ./consul agent -server -bootstrap -data-dir /tmp/consul/ > /tmp/consul.log 2>&1 &
+    sleep 1
+}
+
 docker version
 
 echo "Run integration test"
-sudo service docker restart
+
+setup_consul
+#sudo echo 'DOCKER_OPTS="--cluster-store=consul:127.0.0.1:8500 --cluster-advertise=eth0:2376"' >> /etc/default/docker
+sudo /etc/init.d/docker stop
+sudo /usr/bin/dockerd -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock ${DOCKER_OPTS} --raw-logs > /tmp/docker.log 2>&1 &
+sleep 3
+docker ps
+ps -aux | grep docker
 
 source ./scripts/start-ovn-central.sh
 
