@@ -1,18 +1,18 @@
 # OVN plugin for libnetwork
 
-[![Build Status](https://travis.ibm.com/kangh/libnetwork-ovn-plugin.svg?token=z7j3APJPtnqnWXsjYFyp&branch=master)](https://travis.ibm.com/kangh/libnetwork-ovn-plugin)
+[![Build Status](https://travis-ci.org/huikang/libnetwork-ovn-plugin.svg?branch=master)](https://travis-ci.org/huikang/libnetwork-ovn-plugin)
 
 This repository contains an OVN plugin for libnetwork. The implementation is
 based on the [remote](https://github.com/docker/libnetwork/blob/f6ce0ce8bfc5e3f0c96835b10949cf13591a1708/docs/remote.md) driver of libnetwork. Some idea and implementations refer to two precedents:
-[**docker-ovs-plugin**](https://github.com/gopher-net/docker-ovs-plugin) and [**OVN with Docker**] (http://docs.openvswitch.org/en/latest/howto/docker/).
+[**docker-ovs-plugin**](https://github.com/gopher-net/docker-ovs-plugin) and [**OVN with Docker**](http://docs.openvswitch.org/en/latest/howto/docker/).
 
 ### QuickStart Instructions
 
 The quickstart instructions describe how to start the plugin in **overlay** mode,
 which means the logical networks and containers are created directly on the hosts.
 
-1. Start docker daemon with a global data store
-=============
+
+## Start docker daemon with a global data store
 
 The OVN plugin requires a distributed datastore to support global data scople.
 Therefore, the docker daemo must start with a global data store.
@@ -25,12 +25,11 @@ etcd as the backend data store, e.g.,
     dockerd -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock \
             --cluster-store=consul://CONSULIP:8500 --cluster-advertise=eth0:2376
 
-2. Install open vswitch and ovn
-=============
+## Install open vswitch and ovn
 
 There are many ways of installing OVS and OVN. In this instruction, we will install the use space OVS and OVN (**v2.7.0**) components by docker containers.
 
-*Note*: OVS kernel module must be installed on the host or enabe the user mode OVS bridge (e.g., the [travis-ci script](https://github.ibm.com/kangh/libnetwork-ovn-plugin/blob/3ed4922c234a982a4f9ab541e5a868177df28274/run-integration-tests.sh#L20)).
+*Note*: OVS kernel module must be installed on the host or enabe the user mode OVS bridge (e.g., the [travis-ci script](https://github.com/huikang/libnetwork-ovn-plugin/blob/6e5f911c94a59a589ce4456129524dd81a480ff4/run-integration-tests.sh#L60)).
 
 Compile and install OVN kernel module on the host:
 
@@ -55,8 +54,7 @@ To very the host has been connected to the OVN centralized controller, type
 
     docker exec ovn-central ovn-sbctl show
 
-3.  Start plugins
-=============
+## Start plugins
 
 Start libnetwork OVN plugin:
 
@@ -64,8 +62,7 @@ Start libnetwork OVN plugin:
         ./bin/libnetwork-ovn-plugin
 
 
-4. Test the OVN-managed network for containers
-=============
+## Test the OVN-managed network for containers
 
 Create a network:
 
