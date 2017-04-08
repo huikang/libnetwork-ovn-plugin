@@ -11,7 +11,21 @@ based on the [remote](https://github.com/docker/libnetwork/blob/f6ce0ce8bfc5e3f0
 The quickstart instructions describe how to start the plugin in **overlay** mode,
 which means the logical networks and containers are created directly on the hosts.
 
-1. Install open vswitch and ovn
+1. Start docker daemon with a global data store
+=============
+
+The OVN plugin requires a distributed datastore to support global data scople.
+Therefore, the docker daemo must start with a global data store.
+
+*Note*: since docker swarm mode does not support remote, you can choose consul or
+etcd as the backend data store, e.g.,
+
+
+    ./consul agent -server -bootstrap -data-dir /tmp/consul/
+    dockerd -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock \
+            --cluster-store=consul://CONSULIP:8500 --cluster-advertise=eth0:2376
+
+2. Install open vswitch and ovn
 =============
 
 There are many ways of installing OVS and OVN. In this instruction, we will install the use space OVS and OVN (**v2.7.0**) components by docker containers.
@@ -41,7 +55,7 @@ To very the host has been connected to the OVN centralized controller, type
 
     docker exec ovn-central ovn-sbctl show
 
-2.  Start plugins
+3.  Start plugins
 =============
 
 Start libnetwork OVN plugin:
@@ -50,7 +64,7 @@ Start libnetwork OVN plugin:
         ./bin/libnetwork-ovn-plugin
 
 
-3. Test the OVN-managed network for containers
+4. Test the OVN-managed network for containers
 =============
 
 Create a network:
