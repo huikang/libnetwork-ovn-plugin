@@ -1,6 +1,6 @@
 dist: trusty
 language: go
-go_import_path: github.ibm.com/kangh/libnetwork-ovn-plugin
+go_import_path: github.com/huikang/libnetwork-ovn-plugin
 sudo: true
 
 go:

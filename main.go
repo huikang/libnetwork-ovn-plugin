@@ -5,7 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/go-plugins-helpers/network"
-	"github.ibm.com/kangh/libnetwork-ovn-plugin/ovn"
+	"github.com/huikang/libnetwork-ovn-plugin/ovn"
 	"gopkg.in/urfave/cli.v1"
 )
 
