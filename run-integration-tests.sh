@@ -48,7 +48,7 @@ sleep 3
 docker ps
 ps -aux | grep docker
 
-source ./scripts/start-ovn-central.sh
+source ./scripts/start-ovn.sh -t aio
 
 docker exec $cidovs sh -c "ovn-nbctl show"
 docker exec $cidovs sh -c "ovn-sbctl show"

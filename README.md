@@ -48,7 +48,10 @@ Start the OVS and OVN processes using the script in this repository:
 
 
     go get github.com/huikang/libnetwork-ovn-plugin
-    ./scripts/start-ovn-central.sh
+    ./scripts/start-ovn.sh -t aio
+
+*Note*: the above command uses the script to start an all-in-one mode OVN.
+
 
 To very the host has been connected to the OVN centralized controller, type
 
