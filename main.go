@@ -24,6 +24,11 @@ func main() {
 			Name:  "debug, d",
 			Usage: "enabling debugging",
 		},
+		cli.StringFlag{
+			Name:  "remote, r",
+			Value: ovn.Localhost,
+			Usage: "IP of OVN northound",
+		},
 	}
 
 	app.Action = pluginServer
@@ -36,7 +41,11 @@ func pluginServer(c *cli.Context) error {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	d, err := ovn.NewDriver()
+	nbip := c.GlobalString("remote")
+	log.Debugf("remote ip [ %s ]", nbip)
+	// fixme: validate nbip
+
+	d, err := ovn.NewDriver(nbip)
 	if err != nil {
 		panic(err)
 	}

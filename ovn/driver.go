@@ -15,8 +15,10 @@ import (
 
 const (
 	// DriverName is the ovn plugin name
-	DriverName          = "ovn"
-	localhost           = "127.0.0.1"
+	DriverName = "ovn"
+	// Localhost is the default ovsdb host
+	Localhost = "127.0.0.1"
+
 	bridgePrefix        = "ovnbr-"
 	ovnbridge           = "br-int"
 	containerEthName    = "eth"
@@ -223,7 +225,7 @@ func getInterfaceInfo(req *network.CreateEndpointRequest) (ipaddr, mac string, e
 }
 
 // NewDriver creates an OVN driver
-func NewDriver() (*Driver, error) {
+func NewDriver(nbip string) (*Driver, error) {
 	docker, err := dockerclient.NewDockerClient("unix:///var/run/docker.sock", nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to docker: %s", err)
@@ -233,7 +235,7 @@ func NewDriver() (*Driver, error) {
 	var ovnnb *libovsdb.OvsdbClient
 	retries := 3
 	for i := 0; i < retries; i++ {
-		ovnnb, err = libovsdb.Connect(localhost, ovnNBPort)
+		ovnnb, err = libovsdb.Connect(nbip, ovnNBPort)
 		if err == nil {
 			break
 		}
@@ -249,7 +251,7 @@ func NewDriver() (*Driver, error) {
 	var ovsdb *libovsdb.OvsdbClient
 	retries = 3
 	for i := 0; i < retries; i++ {
-		ovsdb, err = libovsdb.Connect(localhost, ovsdbPort)
+		ovsdb, err = libovsdb.Connect(Localhost, ovsdbPort)
 		if err == nil {
 			break
 		}
