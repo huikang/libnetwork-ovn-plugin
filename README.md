@@ -39,12 +39,11 @@ Compile and install OVN kernel module on the host:
     rmmod openvswitch
     modprobe nf_nat_ipv6
     modprobe gre
-    insmod ./datapath/linux/*.ko
+    insmod ./datapath/linux/openvswitch.ko
+    insmod ./datapath/linux/vport-geneve.ko
 
-
-Make sure that vport_geneve.ko is loaded otherwise the kernel may load an old
-version of geneve module.
-
+The **vport-geneve** module must be installed because the default geneve dose not work with
+the OVS 2.7.0. Also you may need installing other compiled modules.
 
 Start the OVS and OVN processes using the script in this repository:
 

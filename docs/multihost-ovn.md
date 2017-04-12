@@ -19,11 +19,9 @@ ExecStart=/usr/bin/docker daemon --cluster-store=consul://${CONSULNODEIP}:8500 -
 
 Then, restart the docker daemon
 
-``
-systemctl daemon-reload
-systemctl enable docker
-systemctl restart docker
-``
+    systemctl daemon-reload
+    systemctl enable docker
+    systemctl restart docker
 
 To see the docker host has registered itself to the cluster, run:
 
