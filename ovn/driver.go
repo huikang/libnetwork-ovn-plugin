@@ -332,7 +332,7 @@ func (d *Driver) CreateEndpoint(req *network.CreateEndpointRequest) (*network.Cr
 	log.Infof("Create endpoint request: %+v", req)
 
 	if _, ok := d.networks[req.NetworkID]; !ok {
-		return nil, fmt.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
+		return nil, log.Errorf("failed to find logical switch for network id [ %s ]", req.NetworkID)
 	}
 	bridgeName := d.networks[req.NetworkID].BridgeName
 	log.Debugf("Bridge name: [ %s ]", bridgeName)

@@ -50,7 +50,8 @@ Start the OVS and OVN processes using the script in this repository:
     go get github.com/huikang/libnetwork-ovn-plugin
     ./scripts/start-ovn.sh -t aio
 
-*Note*: the above command uses the script to start an all-in-one mode OVN.
+*Note*: the above command uses the script to start an all-in-one mode OVN. Refer
+to the [multihost]() for setting up docker cluster.
 
 
 To very the host has been connected to the OVN centralized controller, type
