@@ -42,6 +42,10 @@ Compile and install OVN kernel module on the host:
     insmod ./datapath/linux/*.ko
 
 
+Make sure that vport_geneve.ko is loaded otherwise the kernel may load an old
+version of geneve module.
+
+
 Start the OVS and OVN processes using the script in this repository:
 
 *Note*: Edit the following script for your own environment
