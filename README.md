@@ -39,8 +39,11 @@ Compile and install OVN kernel module on the host:
     rmmod openvswitch
     modprobe nf_nat_ipv6
     modprobe gre
-    insmod ./datapath/linux/*.ko
+    insmod ./datapath/linux/openvswitch.ko
+    insmod ./datapath/linux/vport-geneve.ko
 
+The **vport-geneve** module must be installed because the default geneve dose not work with
+the OVS 2.7.0. Also you may need installing other compiled modules.
 
 Start the OVS and OVN processes using the script in this repository:
 
@@ -48,7 +51,11 @@ Start the OVS and OVN processes using the script in this repository:
 
 
     go get github.com/huikang/libnetwork-ovn-plugin
-    ./scripts/start-ovn-central.sh
+    ./scripts/start-ovn.sh -t aio
+
+*Note*: the above command uses the script to start an all-in-one mode OVN. Refer
+to the [multihost]() for setting up docker cluster.
+
 
 To very the host has been connected to the OVN centralized controller, type
 

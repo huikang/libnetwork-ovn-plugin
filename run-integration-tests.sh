@@ -7,7 +7,7 @@ set -o xtrace
 function exist_logical_port {
     local ret=1
     sbkey=$1
-    output=`docker exec ovn-central ovsdb-client dump Interface`
+    output=`docker exec $cidovs ovsdb-client dump Interface`
     echo $output | grep -q "$sbkey"
     if [ $? -eq 0 ]
     then
@@ -48,7 +48,7 @@ sleep 3
 docker ps
 ps -aux | grep docker
 
-source ./scripts/start-ovn-central.sh
+source ./scripts/start-ovn.sh -t aio
 
 docker exec $cidovs sh -c "ovn-nbctl show"
 docker exec $cidovs sh -c "ovn-sbctl show"
