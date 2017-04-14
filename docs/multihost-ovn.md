@@ -29,6 +29,8 @@ To see the docker host has registered itself to the cluster, run:
 
 ## Start the ovn centralized node
 
+**Important**: before starting the OVN container, make sure the correct OVS kernel modules are loaded. Otherwise the ovs-vswitch process must be restarted.
+
     go get github.com/huikang/libnetwork-ovn-plugin
     ./scripts/start-ovn.sh -t aio -r ${CENTRALNODEIP} -s ${CENTRALNODEIP}
 
