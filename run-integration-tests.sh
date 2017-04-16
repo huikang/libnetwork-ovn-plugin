@@ -75,6 +75,7 @@ function start_ovn_plugin {
 start_ovn_plugin
 
 NID=`docker network create --attachable --driver ovn --subnet=10.10.10.0/24 test1`
+docker network create --attachable --driver ovn --subnet=10.10.10.0/24 test2
 docker network inspect $NID
 docker exec $cidovs ovn-nbctl show
 

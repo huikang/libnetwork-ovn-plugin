@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -51,6 +52,7 @@ type Driver struct {
 	ovnnber
 	ovsdber
 	dockerer
+	netmu     sync.Mutex // guides networks map
 	networks  map[string]*NetworkState
 	endpoints map[string]*EndpointState
 }
@@ -58,6 +60,7 @@ type Driver struct {
 // NetworkState is filled in at network creation time
 // it contains state that we wish to keep for each network
 type NetworkState struct {
+	id                string
 	BridgeName        string
 	MTU               int
 	Mode              string
@@ -77,7 +80,8 @@ type EndpointState struct {
 }
 
 type ovnnber struct {
-	ovsdb *libovsdb.OvsdbClient
+	ovsdb  *libovsdb.OvsdbClient
+	driver *Driver
 }
 
 type ovsdber struct {
@@ -279,8 +283,10 @@ func NewDriver(nbip string) (*Driver, error) {
 	//recover networks and endpoints
 	netlist, err := d.dockerer.client.ListNetworks("")
 	if err != nil {
-		return nil, fmt.Errorf("could not get  docker networks: %s", err)
+		return nil, fmt.Errorf("could not get docker networks: %s", err)
 	}
+	d.ovnnber.driver = d
+
 	for _, net := range netlist {
 		if net.Driver == DriverName {
 			netInspect, err := d.dockerer.client.InspectNetwork(net.ID)
@@ -292,8 +298,11 @@ func NewDriver(nbip string) (*Driver, error) {
 				return nil, err
 			}
 			ns := &NetworkState{
+				id:         net.ID,
 				BridgeName: bridgeName,
 			}
+			d.netmu.Lock()
+			d.netmu.Unlock()
 			d.networks[net.ID] = ns
 			log.Debugf("exist network create by this driver:%v", netInspect.Name)
 
@@ -311,6 +320,8 @@ func NewDriver(nbip string) (*Driver, error) {
 			}
 		}
 	}
+
+	d.ovnnber.initDBCache()
 
 	// fixmehk: add the following setup
 	// ovs_vsctl("set", "open_vswitch", ".",
@@ -432,6 +443,7 @@ func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
 	log.Debugf("Bindinterface: [ %v ]", bindInterface)
 
 	ns := &NetworkState{
+		id:                req.NetworkID,
 		BridgeName:        bridgeName,
 		MTU:               mtu,
 		Mode:              mode,
@@ -439,7 +451,8 @@ func (d *Driver) CreateNetwork(req *network.CreateNetworkRequest) error {
 		GatewayMask:       mask,
 		FlatBindInterface: bindInterface,
 	}
-
+	d.netmu.Lock()
+	d.netmu.Unlock()
 	d.networks[req.NetworkID] = ns
 
 	log.Debugf("Initializing bridge for network %s", req.NetworkID)
