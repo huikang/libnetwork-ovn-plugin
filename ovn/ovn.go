@@ -3,6 +3,8 @@ package ovn
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
 	"reflect"
 
 	log "github.com/Sirupsen/logrus"
@@ -375,17 +377,27 @@ func (ovnnber *ovnnber) initDBCache() {
 
 	populateCache(*initCache)
 
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Kill, os.Interrupt)
+	go func() {
+		<-c
+		quit <- true
+		os.Exit(1)
+	}()
 	// async monitoring of the ovs bridge(s) for table updates
-	go ovnnber.monitorLogicalSwitches()
+	go ovnnber.monitorLogicalSwitches(quit)
 	/*
 		for ovnnber.getRootUUID() == "" {
 			time.Sleep(time.Second * 1)
 		}*/
 }
 
-func (ovnnber *ovnnber) monitorLogicalSwitches() {
+func (ovnnber *ovnnber) monitorLogicalSwitches(done <-chan bool) {
 	for {
 		select {
+		case <-done:
+			log.Debugf("Quit monitor logical switch goroutine")
+			return
 		case currUpdate := <-update:
 			for table, tableUpdate := range currUpdate.Updates {
 				if table == "Logical_Switch" {
