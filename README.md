@@ -6,14 +6,14 @@ This repository contains an OVN plugin for libnetwork. The implementation is
 based on the [remote](https://github.com/docker/libnetwork/blob/f6ce0ce8bfc5e3f0c96835b10949cf13591a1708/docs/remote.md) driver of libnetwork. Some idea and implementations refer to two precedents:
 [**docker-ovs-plugin**](https://github.com/gopher-net/docker-ovs-plugin) and [**OVN with Docker**](http://docs.openvswitch.org/en/latest/howto/docker/).
 
-### QuickStart Instructions
+## QuickStart Instructions
 
 The quickstart instructions describe how to start the plugin in **overlay** mode,
 which means the logical networks and containers are created directly on the hosts.
 The following steps sets up the OVN plugin for a single docker host; Refer
 to the **[multihost](https://github.com/huikang/libnetwork-ovn-plugin/blob/master/docs/multihost-ovn.md)** for setting up OVN plugin for multi-host docker cluster.
 
-## Start docker daemon with a global data store
+### Start docker daemon with a global data store
 
 The OVN plugin requires a distributed datastore to support global data scope.
 Therefore, the docker daemon must start with a global data store.
@@ -32,7 +32,7 @@ Restart the docker daemon and connect to the consul cluster:
     dockerd -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock \
             --cluster-store=consul://CONSULIP:8500 --cluster-advertise=eth0:2376
 
-## Install Open vSwitch and Ovn
+### Install Open vSwitch and Ovn
 
 There are many ways of installing OVS and OVN. In this instruction, we will install the use space OVS and OVN (**v2.7.0**) components by docker containers.
 
@@ -73,7 +73,7 @@ Also verify that the br-int is created with correct kernel module by:
 
 The above command should return with no error.
 
-## Start plugins
+### Start plugins
 
 Start libnetwork OVN plugin:
 
@@ -81,7 +81,7 @@ Start libnetwork OVN plugin:
         ./bin/libnetwork-ovn-plugin
 
 
-## Test the OVN-managed network for containers
+### Test the OVN-managed network for containers
 
 Create a network:
 
