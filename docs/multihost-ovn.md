@@ -1,7 +1,7 @@
 Bootstrap consul agent on one node
 
      wget https://releases.hashicorp.com/consul/0.8.0/consul_0.8.0_linux_amd64.zip
-     ./consul agent -server -bootstrap -data-dir /tmp/consul/ -client CONSULNODEIP -advertise CONSULNODEIP
+     ./consul agent -server -bootstrap -data-dir /tmp/consul/ -client 0.0.0.0 -advertise CONSULNODEIP
 
 ``CONSULNODEIP`` is the IP address by which other docker hosts can reach the consul node.
 If the node has multiple IP addresses, pick one that is reachable from others.
